@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     stages {
+
         stage('Build')  {
             agent {
                 docker {
@@ -9,6 +10,7 @@ pipeline {
                     reuseNode true
                 }
             }
+
             steps {
                 sh '''
                 ls -la
@@ -20,14 +22,16 @@ pipeline {
                 '''
             }
         }
-    
+
         stage('Test') {
+
             agent {
                 docker {
                     image 'node:18-alpine'
                     reuseNode true
                 }
             }
+
             steps {
                 sh '''
                 test -f build/index.html
@@ -35,32 +39,46 @@ pipeline {
                 '''
             }
         }
-            stage('Deploy to render') {
-                agent {
-                    docker {
-                        image 'node:18'
-                        reuseNode true
-                    }
-                }
-                steps {
-                    //withcredentials([string(credentialsId: 'RENDER_API_KEY', variable: 'RENDER_API_KEY')]) {
-                        sh '''
-                        curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
-                        render --version
-                        '''
-                    
+
+        stage('Deploy to render') {
+
+            agent {
+                docker {
+                    image 'node:18'
+                    reuseNode true
                 }
             }
+
+            steps {
+
+                withCredentials([
+                    string(
+                        credentialsId: 'RENDER_API_KEY',
+                        variable: 'RENDER_API_KEY'
+                    )
+                ]) {
+
+                    sh '''
+                    curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
+                    render --version
+                    '''
+                }
+            }
+        }
     }
-post {
-    always {
-        junit 'test-results/junit.xml'
+
+    post {
+
+        always {
+            junit 'test-results/junit.xml'
+        }
+
+        success {
+            echo 'Pipeline completed - app deployed to Render!'
+        }
+
+        failure {
+            echo 'Pipeline failed - deployment skipped.'
+        }
     }
-    success {
-        echo 'Pipeline completed - app deployed to Render!'
-    }
-    failure {
-        echo 'Pipeline failed - deployment skipped.'
-    }
-}
 }
